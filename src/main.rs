@@ -1,22 +1,31 @@
 use std::env;
 use std::fs;
 use std::io::Read;
+use std::iter::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Please provide an input file as first argument");
+    if args.len() < 3 {
+        println!("Please provide: [i/c] [filename]");
         return;
     }
 
-    let input_text = fs::read_to_string(&args[1]).expect("could not read file");
+    let input_text = fs::read_to_string(&args[2]).expect("could not read file");
     let tokens = parse_tokens(input_text.to_string());
     let operations = tokens_to_operations(tokens);
-    let memory = run_operations(operations);
 
-    println!("");
-    println!("");
-    println!("Memory: {:?}", memory);
+    match args[1].chars().next() {
+        Some('c') => {
+            let compile = operations_to_rust(operations);
+            println!("{}", compile);
+        }
+        Some('i') => {
+            run_operations(operations);
+        }
+        _ => {
+            println!("First argument should b C for compile, or I for interpet");
+        }
+    };
 }
 
 fn run_operations(operations: Vec<Operations>) -> Vec<i32> {
@@ -59,6 +68,50 @@ fn run_operations(operations: Vec<Operations>) -> Vec<i32> {
         stack_pointer = stack_pointer + 1;
     }
     memory
+}
+
+fn operations_to_rust(operations: Vec<Operations>) -> String {
+    let mut index = 0;
+    let operations_string = operations
+        .iter()
+        .map(|o| {
+            let operation_string = match o {
+                Operations::Shift(val) => {
+                    if *val < 0 {
+                        format!("ptr=ptr - {};", (val * -1)).to_string()
+                    } else {
+                        format!("ptr=ptr + {};", val).to_string()
+                    }
+                }
+                Operations::ChangeValue(val) => {
+                    format!("memory[ptr]=memory[ptr] + {};", val).to_string()
+                }
+                Operations::Output => "print!(\"{}\", ((memory[ptr] as u8) as char));".to_string(),
+                Operations::Input => "memory[ptr]=get_input();".to_string(),
+                Operations::Jump(jump_to) => {
+                    if *jump_to > index {
+                        "while memory[ptr] >0 {".to_string()
+                    } else {
+                        "}".to_string()
+                    }
+                }
+            };
+            index = index + 1;
+            operation_string
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+    format!(
+        "use std::io::Read;\n fn main() {{ let mut ptr:usize=0; let mut memory: [i32; 10000] = [0; 10000]; {operations} }} fn get_input() -> i32 {{
+    std::io::stdin()
+        .bytes()
+        .next()
+        .and_then(|result| result.ok())
+        .map(|byte| byte as u8)
+        .unwrap() as i32
+}}",
+        operations = operations_string
+    )
 }
 
 fn tokens_to_operations(tokens: Vec<Tokens>) -> Vec<Operations> {
