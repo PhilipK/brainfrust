@@ -48,9 +48,10 @@ fn run_operations(operations: Vec<Operations>) -> Vec<i32> {
                     memory[memory_pointer as usize] = input_byte as i32;
                 }
             }
-            Operations::Jump(index, jump_is_left) => {
+            Operations::Jump(index) => {
+                let is_forward_jump = index > (stack_pointer as i32);
                 let mem_val = memory[memory_pointer as usize];
-                if jump_is_left && mem_val == 0 || !jump_is_left && mem_val != 0 {
+                if is_forward_jump && mem_val == 0 || !is_forward_jump && mem_val != 0 {
                     stack_pointer = index as usize;
                 }
             }
@@ -81,9 +82,8 @@ fn tokens_to_operations(tokens: Vec<Tokens>) -> Vec<Operations> {
                     Tokens::RightJump => {
                         let matching_left_index =
                             left_bracket_indexes.pop().expect("Found a ] before any [");
-                        new_operation = Operations::Jump(matching_left_index, false);
-                        res[matching_left_index as usize] =
-                            Operations::Jump(prev_index as i32 + 1, true);
+                        new_operation = Operations::Jump(matching_left_index);
+                        res[matching_left_index as usize] = Operations::Jump(prev_index as i32 + 1);
                     }
                     _ => {}
                 }
@@ -102,8 +102,8 @@ fn token_to_operation(token: &Tokens) -> Operations {
         Tokens::Decrement => Operations::ChangeValue(-1),
         Tokens::Output => Operations::Output,
         Tokens::Input => Operations::Input,
-        Tokens::LeftJump => Operations::Jump(0, true),
-        Tokens::RightJump => Operations::Jump(0, false),
+        Tokens::LeftJump => Operations::Jump(0),
+        Tokens::RightJump => Operations::Jump(0),
     }
 }
 
@@ -159,5 +159,5 @@ enum Operations {
     ChangeValue(i32),
     Output,
     Input,
-    Jump(i32, bool),
+    Jump(i32),
 }
